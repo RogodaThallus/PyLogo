@@ -5,20 +5,51 @@ from pygame.color import Color
 from random import randint
 from core.sim_engine import SimEngine
 
+
 class Braess_Road_Patch(Patch):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.road_type = None
+        self.delay = None
 
     def set_road_type(self, type):
         self.road_type = type
 
+    def set_delay(self, type):
+        self.delay = type
+
+
 class Commuter(Agent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, route, **kwargs):
+        super().__init__(route, **kwargs)
+        self.birth_tick = None
+        self.ticks = 1
+        self.route = route
+
+    def count_tick(self):
+        self.ticks = self.ticks + 1
+
+    def set_route(self, choice):
+        self.route = choice
+
+    def move(self, turn=True, patch=True, end=True):
+        if patch == turn:
+            self.face()
+        if patch == end:
+            self.end_trip()
+
+    def face(self, route):
+        super.face()
+
+    def end_trip(self):
+        super.delete(self)
+
+    def delete(self):
+        World.agents.remove(self)
+        World.links -= {lnk for lnk in World.links if lnk.includes(self)}
+
 
 class Braess_Road_World(World):
-
 
     def __init__(self, *args, **kwargs):
 
@@ -48,6 +79,7 @@ class Braess_Road_World(World):
         # world class might have a ticks attribute
         self.ticks = None
         self.middle_on = False
+
     def setup(self):
         # Clear everything
         self.reset_all()
@@ -55,9 +87,9 @@ class Braess_Road_World(World):
         # Set the corner patches
 
         self.top_left_patch: Patch = World.patches_array[2][2]
-        self.top_right_patch: Patch = World.patches_array[2][PATCH_COLS-3]
+        self.top_right_patch: Patch = World.patches_array[2][PATCH_COLS - 3]
         self.bottom_left_patch: Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
-        self.bottom_right_patch: Patch = World.patches_array[PATCH_ROWS-3][2]
+        self.bottom_right_patch: Patch = World.patches_array[PATCH_ROWS - 3][2]
 
         # Set up the roads
         self.setup_roads()
@@ -65,7 +97,7 @@ class Braess_Road_World(World):
     def setup_roads(self):
         # 1. Cover everything in random green grass (set all patches a random green color)
         for patch in self.patches:
-            color = randint(0,16) + 96
+            color = randint(0, 16) + 96
             patch.set_color(Color(0, color, 0))
 
         self.draw_roads()
@@ -83,10 +115,10 @@ class Braess_Road_World(World):
         for p in corner_padding:
             p.set_color(Color('Grey'))
 
-        #set up top and bottom roads, set the road types
-        for i in range(3, PATCH_COLS-3):
+        # set up top and bottom roads, set the road types
+        for i in range(3, PATCH_COLS - 3):
 
-            #top road
+            # top road
             road_type = 1
             self.patches_array[1, i].set_color(Color('Grey'))
             self.patches_array[1, i].set_road_type(road_type)
@@ -94,7 +126,7 @@ class Braess_Road_World(World):
             self.patches_array[3, i].set_road_type(road_type)
             self.patches_array[2, i].set_color(Color('Yellow'))
             self.patches_array[2, i].set_road_type(road_type)
-            #bottom road
+            # bottom road
             self.patches_array[PATCH_ROWS - 2, i].set_color(Color('Grey'))
             self.patches_array[PATCH_ROWS - 2, i].set_road_type(road_type)
             self.patches_array[PATCH_ROWS - 4, i].set_color(Color('Grey'))
@@ -102,7 +134,7 @@ class Braess_Road_World(World):
             self.patches_array[PATCH_ROWS - 3, i].set_color(Color('Yellow'))
             self.patches_array[PATCH_ROWS - 3, i].set_road_type(road_type)
 
-            #left road
+            # left road
             self.patches_array[i, 1].set_color(Color('Grey'))
             self.patches_array[i, 1].set_road_type(road_type)
             self.patches_array[i, 3].set_color(Color('Grey'))
@@ -127,30 +159,32 @@ class Braess_Road_World(World):
                     x = PATCH_ROWS - 4 - i
                     y = 3 + i
                     diagonal_patch = self.patches_array[x][y]
-                    top_patch = self.patches_array[x-1][y]
-                    left_patch = self.patches_array[x][y+1]
+                    top_patch = self.patches_array[x - 1][y]
+                    left_patch = self.patches_array[x][y + 1]
                     diagonal_patch.set_color(Color('Orange'))
                     top_patch.set_color(Color('Grey'))
                     left_patch.set_color(Color('Grey'))
                     if i == 43:
-                        self.patches_array[x-1][y+1].set_color(Color('Orange'))
-                #set the last patch
+                        self.patches_array[x - 1][y + 1].set_color(Color('Orange'))
+                # set the last patch
+
 
 # ############################################## Define GUI ############################################## #
 import PySimpleGUI as sg
-MIDDLE_ON = 'middle_on'
 
+MIDDLE_ON = 'middle_on'
 
 # switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True)
 #                                              for n in reversed(CA_World.bin_0_to_7)]
-gui_left_upper = [[sg.Text('Middle On?', pad=((0,5), (20,0))), sg.CB('True', key=MIDDLE_ON, pad=((0,5), (20,0)))]]
+gui_left_upper = [[sg.Text('Middle On?', pad=((0, 5), (20, 0))), sg.CB('True', key=MIDDLE_ON, pad=((0, 5), (20, 0)))]]
 
-gui_left_upperw = [ [sg.Text('Middle on', pad=((0, 5), (20, 0))),
+gui_left_upperw = [[sg.Text('Middle on', pad=((0, 5), (20, 0))),
                     sg.Slider(key='nbr_agents', range=(1, 101), resolution=25, default_value=25,
-                              orientation='horizontal', size=(10, 20))] ]
-
+                              orientation='horizontal', size=(10, 20))]]
 
 if __name__ == "__main__":
     from core.agent import PyLogo
+
     # PyLogo(Braess_Road_World, 'Braess Road Paradox', gui_left_upper, bounce=True, patch_size=9, board_rows_cols=(71, 71))
-    PyLogo(world_class=Braess_Road_World, caption='Braess Road Paradox', agent_class=Commuter, gui_left_upper=gui_left_upper, patch_class=Braess_Road_Patch)
+    PyLogo(world_class=Braess_Road_World, caption='Braess Road Paradox', agent_class=Commuter,
+           gui_left_upper=gui_left_upper, patch_class=Braess_Road_Patch)
