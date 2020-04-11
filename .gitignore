@@ -1,0 +1,15 @@
+
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/workspace.xml
+.idea/vcs.xml
+core/__pycache__/agent.cpython-37.pyc
+core/__pycache__/gui.cpython-37.pyc
+core/__pycache__/link.cpython-37.pyc
+core/__pycache__/pairs.cpython-37.pyc
+core/__pycache__/sim_engine.cpython-37.pyc
+.idea/misc.xml
+core/__pycache__/graph_framework.cpython-37.pyc
+core/__pycache__/utils.cpython-37.pyc
+core/__pycache__/world_patch_block.cpython-37.pyc
+.idea/PyLogo.iml
+.idea/modules.xml

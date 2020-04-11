@@ -1,11 +1,13 @@
 
 from __future__ import annotations
 
-import math
 from functools import lru_cache
+from math import copysign, hypot
+from random import randint
 
 import core.gui as gui
 import core.utils as utils
+from core.sim_engine import SimEngine
 
 
 class XY(tuple):
@@ -13,28 +15,14 @@ class XY(tuple):
     def __add__(self, xy: XY):
         sum = (self.x + xy.x, self.y + xy.y)
         return self.restore_type(sum)
-        # xx = self[0] + xy[0]
-        # yy = self[1] + xy[1]
-        # return self.restore_type(xx, yy)
 
     def __truediv__(self, scalar):
         quot = (float('inf'), float('inf')) if scalar == 0 else self * (1/scalar)
         return self.restore_type(quot)
-        # return self.restore_type((float('inf'), float('inf'))) if scalar == 0 else self * (1/scalar)
-        # return self.restore_type(float('inf'), float('inf')) if scalar == 0 else self * (1/scalar)
-
 
     def __mul__(self, scalar):
         prod = (self.x * scalar, self.y * scalar)
-        # val1 = self.restore_type(prod)
         return self.restore_type(prod)
-
-        # xx = self.x * scalar
-        # yy = self.y * scalar
-        # val2 =  self.restore_type(xx, yy)
-        # if val1 != val2:
-        #     print(val1, val2)
-        # return val2
 
     def __str__(self):
         clas_string = utils.extract_class_name(self.__class__)
@@ -44,26 +32,24 @@ class XY(tuple):
         diff = (self.x - xy.x, self.y - xy.y)
         return self.restore_type(diff)
 
-        # xx = self[0] - xy[0]
-        # yy = self[1] - xy[1]
-        # return self.restore_type(xx, yy)
-
     def as_int(self):
         int_tuple = (int(self.x), int(self.y))
         return self.restore_type(int_tuple)
-        # return self.restore_type((int(self.x), int(self.y)))
-        # return self.restore_type(int(self.x), int(self.y))
 
-    # def restore_type(self, xx, yy):
-    #     cls = type(self)
-    #     return cls((xx, yy))
-    #
+    def as_tuple(self):
+        return (self.x, self.y)
+
+    def cap_abs_value(self, magnitude_max):
+        new_x = copysign(min(magnitude_max, abs(self.x)), self.x)
+        new_y = copysign(min(magnitude_max, abs(self.y)), self.y)
+        return self.restore_type((new_x, new_y))
+
     def restore_type(self, tuple):
         cls = type(self)
         return cls(tuple)
 
     def round(self, prec=0):
-        rounded_tuple = (round(self.x, prec), round(self.y, prec))
+        # rounded_tuple = (round(self.x, prec), round(self.y, prec))
         # return self.restore_type(rounded)
         return self.restore_type( (round(self.x, prec), round(self.y, prec)) )
         # clas = type(self)
@@ -93,13 +79,15 @@ class Pixel_xy(XY):
     def __str__(self):
         return f'Pixel_xy{self.x, self.y}'
 
-    def closest_block(self, blocks, wrap=True):
-        closest = min(blocks, key=lambda block: self.distance_to(block.center_pixel, wrap))
+    def closest_block(self, blocks):  #  , wrap=True):
+        closest = min(blocks, key=lambda block: self.distance_to(block.center_pixel))
         return closest
 
-    def distance_to(self, other, wrap):
-        # Try all ways to get there including wrapping around.
-        # wrap = not World.THE_WORLD.get_gui_value('bounce')
+    def distance_to(self, other):
+        # Try all ways to get there possibly including wrapping around.
+        bounce = SimEngine.gui_get('Bounce?')
+        wrap = bounce is not None and not bounce
+
         # Can't do this directly since importing World would be circular
         end_pts = [(self, other)]
         if wrap:
@@ -111,7 +99,7 @@ class Pixel_xy(XY):
                                for b in [Pixel_xy.pixel_xy_00, Pixel_xy((0, screen_height/2))]
                                ]
             end_pts += wrapped_end_pts
-        dist = min(math.hypot(start.x - end.x, start.y - end.y) for (start, end) in end_pts)
+        dist = min(hypot(start.x - end.x, start.y - end.y) for (start, end) in end_pts)
         return dist
 
     def heading_toward(self, to_pixel: Pixel_xy):
@@ -131,6 +119,12 @@ class Pixel_xy(XY):
         row = self.y // gui.BLOCK_SPACING()
         col = self.x // gui.BLOCK_SPACING()
         return RowCol((int(row), int(col)))
+
+    @staticmethod
+    def random_pixel():
+        x_random = randint(1, gui.SCREEN_PIXEL_WIDTH()-1)
+        y_random = randint(1, gui.SCREEN_PIXEL_HEIGHT()-1)
+        return Pixel_xy((x_random, y_random))
 
     def wrap(self):
         screen_rect = gui.SCREEN.get_rect()

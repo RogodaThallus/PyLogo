@@ -1,6 +1,4 @@
 
-# This file contains (a) the Agent class and (b) the PyLogo function, which starts a model run.
-
 from math import sqrt
 from random import choice, randint
 from statistics import mean
@@ -48,9 +46,13 @@ class Agent(Block):
 
     id = 0
 
+    key_step_done = True
+
+    some_agent_changed = False
+
     def __init__(self, center_pixel=None, color=None, scale=1.4, shape_name='netlogo_figure'):
-        # Can't make this a default value because pairs.CENTER_PIXEL() isn't defined
-        # when the default values are compiled
+        # Can't make this a default value because pairs.CENTER_PIXEL()
+        # isn't defined when the default values are compiled
         if center_pixel is None:
             center_pixel = pairs.center_pixel()
 
@@ -67,13 +69,15 @@ class Agent(Block):
 
         self.id = Agent.id
         Agent.id += 1
-        # self._label = None
+
         World.agents.add(self)
         self.current_patch().add_agent(self)
 
+        self.animation_target = None
+
         # Agents are created with a random heading and a velocity of 0.
-        # In NetLogo, agents do not have a speed attribute. They have a heading attribute.
-        # They are able to move by a given amount (forward(amount)) in the heading direction.
+        # In NetLogo, agents do not have a speed or velocity attribute. They have a heading attribute.
+        # They move by a given amount (forward(amount)) in the heading direction.
         # After each forward() action, the agent is no longer moving. (But it retains its heading.)
         self.heading = randint(0, 359)
         self.velocity = Velocity.velocity_00
@@ -130,9 +134,11 @@ class Agent(Block):
         return base_image
 
     def create_blank_base_image(self):
+
         # Give the agent a larger Surface (by sqrt(2)) to work with since it may rotate.
         surface_size = XY((self.rect.width, self.rect.height))*SQRT_2
         blank_base_image = Surface(surface_size)
+
         # This sets the rectangle to be transparent.
         # Otherwise it would be black and would cover nearby agents.
         # Even though it's a method of Surface, it can also take a Surface parameter.
@@ -148,8 +154,13 @@ class Agent(Block):
         return patch
 
     def distance_to(self, other):
-        wrap = not SimEngine.gui_get('Bounce?')
-        dist = (self.center_pixel).distance_to(other.center_pixel, wrap)
+        dist = self.distance_to_pixel(other.center_pixel)
+        # wrap = not SimEngine.gui_get('Bounce?')
+        # dist = (self.center_pixel).distance_to(other.center_pixel, wrap)
+        return dist
+
+    def distance_to_pixel(self, pxl):
+        dist = (self.center_pixel).distance_to(pxl)
         return dist
 
     def draw(self, shape_name=None):
@@ -168,9 +179,6 @@ class Agent(Block):
         self.set_velocity(velocity)
         self.move_by_velocity()
 
-    # def get_center_pixel(self_xy) -> Pixel_xy:
-    #     return self.rect.center - Agent.half_patch_pixel).round()
-    #
     def heading_toward(self, target):
         """ The heading required to face the target """
         from_pixel = self.center_pixel
@@ -179,6 +187,10 @@ class Agent(Block):
 
     def in_links(self):
         return [lnk for lnk in World.links if lnk.directed and lnk.agent_2 is self]
+
+    # @property
+    # def label(self):
+    #     return str(self.center_pixel.as_tuple())
 
     def lnk_nbrs(self):
         """
@@ -204,6 +216,14 @@ class Agent(Block):
                 self.set_velocity(new_velocity)
         self.move_by_dxdy(self.velocity)
 
+    def move_agent(self, delta: Velocity):
+        Agent.some_agent_changed = True
+        (capped_x, capped_y) = delta.cap_abs_value(1)
+
+        # Note that x and y have been defined to be getters for center pixels (x, y).
+        new_center_pixel = Pixel_xy( (self.x + capped_x, self.y + capped_y) )
+        self.move_to_xy(new_center_pixel)
+
     def move_to_patch(self, patch):
         self.move_to_xy(patch.center_pixel)
 
@@ -222,6 +242,15 @@ class Agent(Block):
     def out_links(self):
         return [lnk for lnk in World.links if lnk.directed and lnk.agent_1 is self]
 
+    @staticmethod
+    def run_an_animation_step():
+        Agent.key_step_done = True
+        visited_agents = set()
+        for node in World.agents:
+            if node.animation_target and node not in visited_agents:
+                visited_agents.add(node)
+                node.take_animation_step()
+
     def set_center_pixel(self, xy: Pixel_xy):
         self.center_pixel: Pixel_xy = xy.wrap()
         # Set the center point of this agent's rectangle.
@@ -232,8 +261,25 @@ class Agent(Block):
         self.base_image = self.create_base_image()
 
     def set_heading(self, heading):
-        # Keep heading an int in range(360)
+        # Keep heading as an int in range(360)
         self.heading = int(round(heading))
+
+    def set_target_by_dxdy(self, velocity):
+        self.animation_target = self.center_pixel + velocity
+
+    # noinspection PyTypeChecker
+    def take_animation_step(self):
+        if not self.animation_target:
+            return
+
+        delta = self.animation_target - self.center_pixel
+        if abs(delta.x) > 0 or abs(delta.y) > 0:
+            Agent.key_step_done = False
+        self.move_agent(delta)
+
+        if abs(self.distance_to_pixel(self.animation_target)) < 0.5:
+            self.move_to_xy(self.animation_target)
+            self.animation_target = None
 
     def turn_left(self, delta_angles):
         self.turn_right(-delta_angles)
@@ -247,6 +293,10 @@ class Agent(Block):
 
     def undirected_links(self):
         return [lnk for lnk in self.all_links() if not lnk.directed]
+
+    @property
+    def x_y(self):
+        return self.center_pixel.as_tuple()
 
     @property
     def x(self):
