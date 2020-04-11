@@ -20,33 +20,46 @@ class Braess_Road_Patch(Patch):
 
 
 class Commuter(Agent):
-    def __init__(self, route, **kwargs):
-        super().__init__(route, **kwargs)
-        self.birth_tick = None
-        self.ticks = 1
-        self.route = route
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.birth_tick = Braess_Road_World.ticks
+        self.ticks = None
+        self.route = None
 
     def count_tick(self):
-        self.ticks = self.ticks + 1
+        self.ticks += 1
 
     def set_route(self, choice):
         self.route = choice
 
-    def move(self, turn=True, patch=True, end=True):
-        if patch == turn:
+    def move(self):
+        type = Braess_Road_Patch.road_type
+        if type == "Turn":
             self.face()
-        if patch == end:
+            self.forward()
+            self.count_tick()
+        elif type == "end":
             self.end_trip()
+        else:
+            self.forward()
+            self.count_tick()
 
-    def face(self, route):
-        super.face()
+    def face(self):
+        route = self.route()
+        if route == "C":
+            if self.current_patch() == World.patches_array[2][PATCH_COLS - 3]:
+                self.heading_toward(World.patches_array[PATCH_ROWS - 3][2])
+            else:
+                self.heading_toward(World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3])
+        else:
+            self.heading_toward(World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3])
 
     def end_trip(self):
-        super.delete(self)
+        self.report()
+        self.remove()
 
-    def delete(self):
-        World.agents.remove(self)
-        World.links -= {lnk for lnk in World.links if lnk.includes(self)}
+    def report(self):
+        return self.ticks
 
 
 class Braess_Road_World(World):
