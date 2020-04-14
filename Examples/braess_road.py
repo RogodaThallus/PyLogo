@@ -153,6 +153,7 @@ class Braess_Road_World(World):
                 to_remove.append(commuter)
         for commuter in to_remove:
             World.agents.remove(commuter)
+        self.update_ticks()
 
     def commuter_stats(self, commuter):
         # calculates travel times and adds them to the appropurate route tracker
@@ -444,6 +445,9 @@ class Braess_Road_World(World):
         SimEngine.gui_set(FASTEST_TOP, value=str(self.latest_top_time))
         SimEngine.gui_set(FASTEST_MIDDLE, value=str(self.latest_middle_time))
         SimEngine.gui_set(FASTEST_BOTTOM, value=str(self.latest_bottom_time))
+
+    def update_ticks(self):
+        SimEngine.gui_set(TICKS, value=str(self.ticks))
         # SimEngine.gui_set(AVERAGE, value=str(self.avg_time))
         # SimEngine.gui_set(AVERAGE, value=str(self.avg_time))
         # SimEngine.gui_set(AVERAGE, value=str(self.avg_time))
