@@ -72,7 +72,7 @@ class Commuter(Agent):
                     #there is an extra number of ticks equal to delay so we remove them here
                     if self.route == BRAESS_ROAD_ROUTE:
                         self.birth_tick = self.birth_tick + 5
-                    self.commute_complete = True
+                    self.end_trip()
                 self.ticks_here = 1
 
         # increase the birth ticks by one for each tick that the commuter is on braess road
