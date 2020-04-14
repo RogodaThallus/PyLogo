@@ -126,6 +126,7 @@ class Braess_Road_World(World):
 
         # world class might have a ticks attribute
         self.middle_on = False
+        self.middle_prev = False
 
     def setup(self):
         # Clear everything
@@ -144,6 +145,7 @@ class Braess_Road_World(World):
         self.setup_roads()
 
     def step(self):
+        self.check_middle()
         self.spawn_commuters()
         #determine congestion
         self.determine_congestion()
@@ -224,11 +226,6 @@ class Braess_Road_World(World):
             # elif new_commuter.route == BOTTOM_ROUTE:
             #     new_commuter.face(self.bottom_left_patch)
 
-            #todo
-            #remove test code
-            # print(center_pixel)
-            # print("spawned Commuter")
-            # print('Cars Spawned = ' + str(self.cars_spawned))
 
             self.cars_spawned += 1
 
@@ -238,6 +235,7 @@ class Braess_Road_World(World):
             self.spawn_time += 1
 
     def setup_roads(self):
+        '''sets up the colors of the corners, draws the roads, along with the shoulders'''
         #Cover everything in random green grass (set all patches a random green color)
         for patch in self.patches:
             color = randint(0,16) + 96
@@ -261,9 +259,8 @@ class Braess_Road_World(World):
         self.draw_road(CONSTANT_CONGESTION, self.top_left_patch, self.bottom_left_patch)
         self.draw_road(CONSTANT_CONGESTION, self.top_right_patch, self.bottom_right_patch)
 
-        #Check for middle and draw it or disable it
-        self.middle_on = SimEngine.gui_get(MIDDLE_ON)
-        self.middle_prev = self.middle_on
+        #get the middle gui data and check to draw it
+        self.check_middle()
 
         if self.middle_on:
             self.draw_road(BRAESS_ROAD_ENABLED, self.top_right_patch, self.bottom_left_patch)
@@ -281,6 +278,8 @@ class Braess_Road_World(World):
             patch.set_delay = 1
 
     def determine_congestion(self):
+        '''Determines the congestion in the top and bottom road segments'''
+
         #calculate congestion for the top road
         #patches in the top road
         top_road = self.patches_line(self.top_left_patch, self.top_right_patch)[1:-1]
@@ -291,33 +290,42 @@ class Braess_Road_World(World):
         for patch in top_road:
             patch.delay = delay
 
+        #calcultate the congestion for the bottom road
         delay = 1
         bottom_road = self.patches_line(self.bottom_left_patch, self.bottom_right_patch)[1:-1]
         bottom_road_commuters = [x for x in World.agents if x.current_patch() in bottom_road]
 
-        # print(len(bottom_road))
-        # print(len(bottom_road_commuters))
         delay = len(bottom_road_commuters) * VARIABLE_CONGESTION_DELAY
         for patch in bottom_road:
             patch.delay = delay
 
     def check_middle(self):
+        '''checks to see if middle road is on or off, and then turns it off when there are no cars taking the route'''
+        self.middle_on = SimEngine.gui_get(MIDDLE_ON)
+        # print('=====')
+        # print(str(SimEngine.gui_get(MIDDLE_ON)))
+        # print(self.middle_on)
         if self.middle_on != self.middle_prev:
             if self.middle_on:
                 self.draw_road(BRAESS_ROAD_ENABLED, self.top_right_patch, self.bottom_left_patch)
-                self.middle_prev = SimEngine.gui_get(MIDDLE_ON)
+                self.middle_prev = self.middle_on
             else:
-                braess_road_commuters = [x for x in self.agent_class if x.route == BRAESS_ROAD_ROUTE]
-                if len(braess_road_commuters) > 0:
+                braess_road_commuters = [x for x in self.agents if x.route == BRAESS_ROAD_ROUTE]
+                if len(braess_road_commuters) == 0:
                     self.draw_road(BRAESS_ROAD_DISABLED, self.top_right_patch, self.bottom_left_patch)
-                    self.middle_prev = SimEngine.gui_get(MIDDLE_ON)
+                    self.middle_prev = self.middle_on
 
     def select_route(self):
-        return self.probabilistic_greedy()
+        if SimEngine.gui_get(SELECTION_ALGORITHM) == EMPIRICAL_ANALYTICAl:
+            return self.probabilistic_analytic()
+        if SimEngine.gui_get(SELECTION_ALGORITHM) == PROBABILISTIC_GREEDY:
+            pass
+        if SimEngine.gui_get(SELECTION_ALGORITHM) == BEST_KNOWN:
+            pass
 
 
         algorithm = SimEngine.gui_get(SELECTION_ALGORITHM)
-    def probabilistic_greedy(self):
+    def probabilistic_analytic(self):
         if self.middle_on:
             top_road_time = self.road_travel_time(self.top_right_patch, self.top_left_patch)
             bottom_road_time = self.road_travel_time(self.bottom_right_patch, self.bottom_left_patch)
@@ -328,9 +336,9 @@ class Braess_Road_World(World):
             middle_route_time = top_road_time + bottom_road_time
             bottom_route_time = left_road_time + bottom_road_time
 
-            if top_road_time < middle_route_time and top_road_time < bottom_road_time:
+            if top_route_time < middle_route_time and top_route_time < bottom_route_time:
                 return TOP_ROUTE
-            if bottom_road_time < middle_route_time and bottom_road_time < top_road_time:
+            if bottom_route_time < middle_route_time and bottom_route_time < top_route_time:
                 return BOTTOM_ROUTE
             else:
                 return BRAESS_ROAD_ROUTE
@@ -492,4 +500,4 @@ if __name__ == "__main__":
     from core.agent import PyLogo
     # PyLogo(Braess_Road_World, 'Braess Road Paradox', gui_left_upper, bounce=True, patch_size=9, board_rows_cols=(71, 71))
     PyLogo(world_class=Braess_Road_World, caption='Braess Road Paradox', agent_class=Commuter,
-           gui_left_upper=gui_left_upper, patch_class=Braess_Road_Patch, fps=5)
+           gui_left_upper=gui_left_upper, patch_class=Braess_Road_Patch)
