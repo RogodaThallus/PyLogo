@@ -19,7 +19,7 @@ BRAESS_ROAD_DISABLED = 3
 
 CONSTANT_CONGESTION_DELAY = 15
 #variable congestion delay is # of vehicles * the constant below
-#VARIABLE_CONGESTION_DELAY = 2
+# VARIABLE_CONGESTION_DELAY = 2
 
 class Braess_Road_Patch(Patch):
     def __init__(self, *args, **kwargs):
@@ -91,10 +91,10 @@ class Braess_Road_World(World):
         super().__init__(*args, **kwargs)
         self.reset()
 
-        Braess_Road_World.top_left_patch: Patch = World.patches_array[2][2]
-        Braess_Road_World.top_right_patch: Patch = World.patches_array[2][PATCH_COLS - 3]
-        Braess_Road_World.bottom_left_patch: Patch = World.patches_array[PATCH_ROWS - 3][2]
-        Braess_Road_World.bottom_right_patch: Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
+        Braess_Road_World.top_left_patch= World.patches_array[2][2]
+        Braess_Road_World.top_right_patch = World.patches_array[2][PATCH_COLS - 3]
+        Braess_Road_World.bottom_left_patch = World.patches_array[PATCH_ROWS - 3][2]
+        Braess_Road_World.bottom_right_patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
 
     def reset(self):
         self.reset_all()
@@ -125,13 +125,7 @@ class Braess_Road_World(World):
         # Clear everything
         self.reset()
 
-        # Set the corner patches
-        # self.top_left_patch: Patch = World.patches_array[2][2]
-        # self.top_right_patch: Patch = World.patches_array[2][PATCH_COLS-3]
-        # self.bottom_left_patch: Patch = World.patches_array[PATCH_ROWS - 3][2]
-        # self.bottom_right_patch: Patch = World.patches_array[PATCH_ROWS - 3][PATCH_COLS - 3]
-
-        #grab all gui variables
+        #grab gui variables
         self.spawn_rate = SimEngine.gui_get(SPAWN_RATE)
 
         # Set up the roads
@@ -140,24 +134,24 @@ class Braess_Road_World(World):
     def step(self):
         self.check_middle()
         self.spawn_commuters()
-        #determine congestion
         self.determine_congestion()
-        #move commuters
+
+        #stores all commuters that have set their end commute flag
         to_remove = []
+
         for commuter in World.agents:
-            #list of commuters to remove at the end of this method
             commuter.move()
             #check if any commuters have finished their commute
             if commuter.commute_complete:
                 self.commuter_stats(commuter)
                 to_remove.append(commuter)
+
+        #removes all commuters in the to_remove list
         for commuter in to_remove:
             World.agents.remove(commuter)
-        self.update_ticks()
 
     def commuter_stats(self, commuter):
         # calculates travel times and adds them to the appropurate route tracker
-        # kills commuter
 
         # rate is the frame rate at wchich the sim is running
         travel_time = (World.ticks - commuter.birth_tick)
@@ -211,16 +205,6 @@ class Braess_Road_World(World):
             #spawn Commuter
             center_pixel = self.top_left_patch.center_pixel
             self.agent_class(center_pixel=center_pixel, birth_tick=World.ticks, route=self.select_route())
-            # if self.middle_on:
-            #     self.agent_class(center_pixel=center_pixel, birth_tick=World.ticks, route=randint(0,2))
-            # else:
-            #     self.agent_class(center_pixel=center_pixel, birth_tick=World.ticks, route=randint(0,1))
-            # if new_commuter.route == TOP_ROUTE or new_commuter.route == BRAESS_ROAD:
-            #     new_commuter.face(self.top_right_patch)
-            # elif new_commuter.route == BOTTOM_ROUTE:
-            #     new_commuter.face(self.bottom_left_patch)
-
-
             self.cars_spawned += 1
 
             self.spawn_time = 0
@@ -313,23 +297,82 @@ class Braess_Road_World(World):
         if SimEngine.gui_get(SELECTION_ALGORITHM) == EMPIRICAL_ANALYTICAl:
             return self.probabilistic_analytic()
         if SimEngine.gui_get(SELECTION_ALGORITHM) == PROBABILISTIC_GREEDY:
-            pass
+            return self.greedy()
         if SimEngine.gui_get(SELECTION_ALGORITHM) == BEST_KNOWN:
-            pass
+            return self.best_route()
 
+    # turtle context reporter
+    # assigns a route to the commuter with a probability propotional to
+    # how much better the route is than the other routes
+    def greedy(self):
+            if self.middle_on:
+                if self.latest_middle_time == 0 or self.latest_top_time == 0 or self.latest_bottom_time == 0:
+                    return randint(0,2)
+                else:
+                    top_different = 2 - self.latest_top_time
+                    if top_different < 0:
+                        top_different = 0
+                    top_different = top_different **  (int(SimEngine.gui_get(RANDOMNESS)) / 10)
+                    bottom_different = 2 - self.latest_bottom_time
+                    if bottom_different < 0:
+                        bottom_different = 0
+                    bottom_different = bottom_different **  (int(SimEngine.gui_get(RANDOMNESS)) / 10)
+                    middle_different = 2 - self.latest_middle_time
+                    if middle_different < 0:
+                        middle_different = 0
+                    middle_different = middle_different ** (int(SimEngine.gui_get(RANDOMNESS)) / 10)
 
-        algorithm = SimEngine.gui_get(SELECTION_ALGORITHM)
+                    sigma1 = 0
+                    sigma2 = 0
+                    if not (top_different + bottom_different + middle_different) == 0:
+                        sigma1 = top_different / (top_different + bottom_different + middle_different)
+                        sigma2 = bottom_different / (top_different + bottom_different + middle_different)
+                    else:
+                        sigma1 = 0.33
+                        sigma2 = 0.33
+
+                    self.top_prob = sigma1
+                    self.bottom_prob = sigma2
+                    self.middle_prob = 1 - sigma1 - sigma2
+                    split1 = 1000 * sigma1
+                    split2 = 1000 * (sigma1 + sigma2)
+                    rand = randint(0, 999)
+                    if rand < split1:
+                        return 0
+                    else:
+                        if rand < split2:
+                            return 1
+                        else:
+                            return 2
+            else:
+                if self.latest_top_time == 0 or self.latest_bottom_time == 0:
+                    return randint(0,1)
+                else:
+                    top_different = (2 - self.latest_top_time) ** (int(SimEngine.gui_get(RANDOMNESS)) / 10)
+                    bottom_different = (2 - self.latest_bottom_time) ** (int(SimEngine.gui_get(RANDOMNESS)) / 10)
+                    sigma = top_different / (top_different + bottom_different)
+                    top_prob = sigma
+                    bottom_prop = 1 - sigma
+                    split = 1000 * sigma
+                    if randint(0, 999) < split:
+                        return 0
+                    else:
+                        return 1
+
     def probabilistic_analytic(self):
         if self.middle_on:
+            #find the road times of all segments
             top_road_time = self.road_travel_time(self.top_right_patch, self.top_left_patch)
             bottom_road_time = self.road_travel_time(self.bottom_right_patch, self.bottom_left_patch)
             left_road_time = self.road_travel_time(self.top_left_patch, self.bottom_left_patch)
             right_road_time = self.road_travel_time(self.top_right_patch, self.bottom_right_patch)
 
+            #find all the route times
             top_route_time = top_road_time + right_road_time
             middle_route_time = top_road_time + bottom_road_time
             bottom_route_time = left_road_time + bottom_road_time
 
+            #select the one that has the least projected time with the current agents
             if top_route_time < middle_route_time and top_route_time < bottom_route_time:
                 return TOP_ROUTE
             if bottom_route_time < middle_route_time and bottom_route_time < top_route_time:
@@ -344,6 +387,62 @@ class Braess_Road_World(World):
                 top_route_count = len([x for x in World.agents if x.route == TOP_ROUTE])
                 bottom_route_count = len([x for x in World.agents if x.route == BOTTOM_ROUTE])
                 return TOP_ROUTE if top_route_count < bottom_route_count else BOTTOM_ROUTE
+
+    #turtle context reporter
+    # assigns a route to the commuter that currently has the best travel time
+    # with some random chance of deviating to a less optimal route
+
+    # old version
+    # def best_route(self):
+        # CAN DELETE AFTER REVIEW --> the below lines are the way I(Sam) did best_known, however I saw someone had one as here as well
+        #   so I added mine so you can see what/how I did it but I choose to comment it out because there's a few errors
+        #   I believe in the indents.
+        #
+        #     if self.latest_middle_time == 0 or self.latest_top_time == 0 or self.latest_bottom_time == 0:
+        #         return randint(0, 2)
+        # else:
+        #     if randint(0, 99) < 100 - int(SimEngine.gui_get(RANDOMNESS)):
+        #         if self.latest_middle_time < self.latest_top_time and self.latest_middle_time < self.latest_bottom_time:
+        #             return 2
+        #     else:
+        #         if self.latest_top_time < self.latest_middle_time and self.latest_top_time < self.latest_bottom_time:
+        #             return 0
+        #         else:
+        #             return 1
+        #         else:
+        #             return randint(0, 2)
+        #     else:
+        #     if self.latest_top_time == 0 or self.latest_bottom_time == 0:
+        #      return randint(0, 1)
+        #     else:
+        #     if randint(0, 99) < 100 - int(SimEngine.gui_get(RANDOMNESS)):
+        #     if self.latest_top_time < self.latest_bottom_time:
+        #         return 0
+        #     else:
+        #         return 1
+        #     else:
+        #         return randint(0, 1)
+
+
+    def best_route(self):
+        if self.middle_on:
+            if self.latest_top_time == 0 or self.latest_bottom_time == 0 or self.latest_middle_time == 0:
+                return randint(0, 2)
+            else:
+                if self.latest_top_time < self.latest_middle_time and self.latest_top_time < self.latest_bottom_time:
+                    return TOP_ROUTE
+                if self.latest_middle_time < self.latest_top_time and self.latest_middle_time < self.latest_bottom_time:
+                    return BRAESS_ROAD_ROUTE
+                else:
+                    return BOTTOM_ROUTE
+        else:
+            if self.latest_top_time == 0 or self.latest_bottom_time == 0:
+                return randint(0,1)
+            else:
+                if self.latest_top_time < self.latest_bottom_time:
+                    return TOP_ROUTE
+                else:
+                    return BOTTOM_ROUTE
 
     def road_travel_time(self, start_patch, stop_patch):
         #find all the commuters on the segment of road
@@ -469,8 +568,6 @@ FASTEST_BOTTOM = 'fastest bottom'
 VARIABLE_CONGESTION_DELAY = "Dynamic"
 TICKS = 'Ticks'
 
-# switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True)
-#                                              for n in reversed(CA_World.bin_0_to_7)]
 gui_left_upper = [[sg.Text('Middle On?', pad=((0,5), (20,0))), sg.CB('True', key=MIDDLE_ON, pad=((0,5), (10,0)))],
                    [sg.Text('Spawn Rate', pad=((0, 5), (20, 0))),
                     sg.Slider(key=SPAWN_RATE, default_value=60, resolution=10, range=(4, 140), pad=((0, 5), (10, 0)),
@@ -492,15 +589,9 @@ gui_left_upper = [[sg.Text('Middle On?', pad=((0,5), (20,0))), sg.CB('True', key
                   [sg.Text('Fastest Middle Time = '), sg.Text('         0', key=FASTEST_MIDDLE)],
                   [sg.Text('Fastest Bottom Time = '), sg.Text('         0', key=FASTEST_BOTTOM)],
                   [sg.Text('Ticks = '), sg.Text('         0', key=TICKS)]]
-                  # [sg.Text('Average= '), sg.Text('         0', key=AVERAGE)],
-                  # [sg.Text('Average= '), sg.Text('         0', key=AVERAGE)],
-                  # [sg.Text('Average= '), sg.Text('         0', key=AVERAGE)],
-                  # [sg.Text('Average= '), sg.Text('         0', key=AVERAGE)],]
 
-# sg.Combo([PREF_ATTACHMENT, RANDOM, RING, SMALL_WORLD, STAR, WHEEL], size=(11, 20),
-#                               key=GRAPH_TYPE, pad=((5, 0), (20, 0)), default_value=WHEEL, tooltip='graph type')
-if __name__ == "__main__":
-    from core.agent import PyLogo
-    # PyLogo(Braess_Road_World, 'Braess Road Paradox', gui_left_upper, bounce=True, patch_size=9, board_rows_cols=(71, 71))
-    PyLogo(world_class=Braess_Road_World, caption='Braess Road Paradox', agent_class=Commuter,
+from core.agent import PyLogo
+
+# PyLogo(Braess_Road_World, 'Braess Road Paradox', gui_left_upper, bounce=True, patch_size=9, board_rows_cols=(71, 71))
+PyLogo(world_class=Braess_Road_World, caption='Braess Road Paradox', agent_class=Commuter,
            gui_left_upper=gui_left_upper, patch_class=Braess_Road_Patch)

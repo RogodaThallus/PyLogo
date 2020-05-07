@@ -4,7 +4,7 @@ from random import choice, randint, sample
 from pygame import Color
 
 from core.agent import Agent, PYGAME_COLORS
-from core.sim_engine import SimEngine
+from core.sim_engine import gui_get
 from core.world_patch_block import Patch, World
 
 
@@ -136,14 +136,13 @@ class SegregationWorld(World):
             return colors if sums[0] < sums[1] else [colors[1], colors[0]]
 
     def setup(self):
-        density = SimEngine.gui_get('density')
-        SegregationAgent.pct_similar_wanted = SimEngine.gui_get('% similar wanted')
+        density = gui_get('density')
+        SegregationAgent.pct_similar_wanted = gui_get('% similar wanted')
         self.color_items = self.select_the_colors()
         (color_a, color_b) = [color_item[1] for color_item in self.color_items]
         print(f'\n\t The colors: {self.colors_string()}')
         self.empty_patches = set()
-        self.max_agents_per_step = SimEngine.gui_get('max_agent_per_step')
-        # print('About to create agents')
+        self.max_agents_per_step = gui_get('max_agents_per_step')
         for patch in self.patches:
             patch.set_color(self.patch_color)
             patch.neighbors_8()  # Calling neighbors_8 stores it as a cached value
@@ -155,15 +154,13 @@ class SegregationWorld(World):
                 agent.move_to_patch(patch)
             else:
                 self.empty_patches.add(patch)
-        # print('Finished creating agents')
         self.update_all()
 
     def step(self):
         nbr_unhappy_agents = len(self.unhappy_agents)
-        # If there is a small number of unhappy agents, move them carefully.
-        # Otherwise move the smaller of self.max_agents_per_step and nbr_unhappy_agents
-        sample_size = max(1, round(nbr_unhappy_agents/2)) if nbr_unhappy_agents <= 4 else \
-                      min(self.max_agents_per_step, nbr_unhappy_agents)
+        # If there are only a few unhappy agents, move them carefully.
+        # Otherwise move the smaller of self.max_agents_per_step and nbr_unhappy_agents/2
+        sample_size = min(self.max_agents_per_step, max(1, nbr_unhappy_agents//2))
         for agent in sample(self.unhappy_agents, sample_size):
             agent.find_new_spot(self.empty_patches)
         self.update_all()
@@ -202,8 +199,8 @@ gui_left_upper = [[sg.Text('density'),
                                    'to make someone happy.')],
 
                   [sg.Text('Max agents per step'),
-                   sg.Slider(key='max_agent_per_step', range=(10, 1000), resolution=10, size=(10, 20),
-                             default_value=100, orientation='horizontal', pad=((0, 0), (0, 20)),
+                   sg.Slider(key='max_agents_per_step', range=(10, 2000), resolution=10, size=(10, 20),
+                             default_value=500, orientation='horizontal', pad=((0, 0), (0, 20)),
                              tooltip='Maximium number of unhappy agents to move each step.')],
                   ]
 

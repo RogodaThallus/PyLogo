@@ -25,14 +25,55 @@ def link_exists(agent_1, agent_2, directed=False):
     return links[0] if links else None
 
 
+def is_reachable_via(agent_1, link_list, agent_2) -> bool:
+    seen = {agent_1}
+    frontier = [agent_1]
+    while frontier:
+        agent = frontier.pop(0)
+        seen.add(agent)
+        new_nghbrs = [lnk.other_side(agent) for lnk in link_list
+                      if lnk.includes(agent) and lnk.other_side(agent) not in seen]
+        if agent_2 in new_nghbrs:
+            return True
+        frontier.extend(new_nghbrs)
+    return False
+
+
+def minimum_spanning_tree(agent_list):
+    len_agent_list = len(agent_list)
+    all_links = [Link(agent_list[i], agent_list[j], add_to_world_links=False, color=Color('green'), width=2)
+                 for i in range(len_agent_list - 1)
+                 for j in range(i + 1, len_agent_list)]
+    sorted_links = sorted(all_links, key=lambda lnk: lnk.length)
+    reachable_points = set()
+    link_list = []
+    for lnk in sorted_links:
+        if not is_reachable_via(lnk.agent_1, link_list, lnk.agent_2):
+            link_list.append(lnk)
+            reachable_points |= {lnk.agent_1, lnk.agent_2}
+    return link_list
+
+
+def seq_to_links(agents):
+    """
+    Agents is a sequence (list or tuple) of Agents.
+    Returns the links that join them, include one from the end to the start.
+    """
+    links = []
+    if len(agents) > 1:
+        for i in range(len(agents)):
+            lnk = Link(agents[i], agents[(i + 1) % len(agents)])
+            links.append(lnk)
+    return links
+
+
 class Link:
 
-    def __init__(self, agent_1: Agent, agent_2: Agent, directed: bool = False,
+    def __init__(self, agent_1: Agent, agent_2: Agent, directed: bool = False, add_to_world_links: bool = True,
                  color: Color = Color('white'), width: int = 1):
         if None in {agent_1, agent_2}:
             raise Exception(f"Can't link to None: agent_1: {agent_1}, agent_2: {agent_2}.")
-        self.agent_1: Agent = agent_1
-        self.agent_2: Agent = agent_2
+        (self.agent_1, self.agent_2) = (agent_1, agent_2) if directed or agent_1 < agent_2 else (agent_2, agent_1)
         self.both_sides = {agent_1, agent_2}
         if len(self.both_sides) != 2:
             raise Exception(f"Can't have a link from a node to itself: {agent_1} == {agent_2}.")
@@ -42,7 +83,8 @@ class Link:
         self.default_color = color
         self.color = color
         self.width = width
-        World.links.add(self)
+        if add_to_world_links:
+            World.links.add(self)
 
     def __eq__(self, other: Link):
         """
@@ -59,12 +101,15 @@ class Link:
     def __str__(self):
         return f'{self.agent_1} {"-->" if self.directed else "<-->"} {self.agent_2}'
 
+    def __repr__(self):
+        return f'{self.agent_1} {"-->" if self.directed else "<-->"} {self.agent_2}'
+
     def draw(self):
         # gui.draw_line(self.agent_1.rect.center, self.agent_2.rect.center, line_color=self.color, width=self.width)
         gui.draw_line(self.agent_1.center_pixel, self.agent_2.center_pixel, line_color=self.color, width=self.width)
-        if (my_label := self.label) is not None:
+        if (self.label) is not None:
             # Pass the label to avoid computing it twice.
-            self.draw_label(my_label)
+            self.draw_label(self.label)
 
     def draw_label(self, my_label):
         offset = int(0.5*gui.PATCH_SIZE)
@@ -83,12 +128,9 @@ class Link:
     def label(self):
         return None
 
-    def siblings(self):
-        """
-        Return: A tuple with the lnk_nbrs on each side, smaller side first
-        """
-        sibs = (self.agent_1.lnk_nbrs(), self.agent_2.lnk_nbrs())
-        return sibs if len(sibs[0]) < len(sibs[1]) else (sibs[1], sibs[0])
+    @property
+    def length(self) -> float:
+        return round(self.agent_1.distance_to(self.agent_2), 1)
 
     def other_side(self, node):
         return (self.both_sides - {node}).pop()
@@ -98,3 +140,10 @@ class Link:
 
     def set_width(self, width):
         self.width = width
+
+    def siblings(self):
+        """
+        Return: A tuple with the lnk_nbrs on each side, smaller side first
+        """
+        sibs = (self.agent_1.lnk_nbrs(), self.agent_2.lnk_nbrs())
+        return sibs if len(sibs[0]) < len(sibs[1]) else (sibs[1], sibs[0])

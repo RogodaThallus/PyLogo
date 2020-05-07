@@ -139,7 +139,8 @@ def draw_label(label, text_center, obj_center, line_color):
     # text_center = Pixel_xy((self.rect.x + offset, self.rect.y + offset))
     gui.blit(text, text_center)
     # line_color = Color('white') if isinstance(self, Patch) and self.color == Color('black') else self.color
-    gui.draw_line(start_pixel=obj_center, end_pixel=text_center, line_color=line_color)
+    if line_color is not None:
+        gui.draw_line(start_pixel=obj_center, end_pixel=text_center, line_color=line_color)
 
 
 def draw_line(start_pixel, end_pixel, line_color: Color = Color('white'), width=1):
@@ -156,17 +157,11 @@ class SimpleGUI:
         gui.PATCH_COLS = board_rows_cols[1] if board_rows_cols[1] % 2 == 1 else board_rows_cols[1] + 1
 
         self.EXIT = 'Exit'
-        # self.FPS = 'fps'
-        # self.GO = 'go'
-        # self.GO_ONCE = 'go once'
-        # self.GOSTOP = 'GoStop'
         self.GRAPH = '-GRAPH-'
         self.SETUP = 'setup'
         self.STOP = 'Stop'
 
         self.clock = pg.time.Clock()
-        # self.fps = fps if fps else 60
-        # self.idle_fps = 10
 
         self.caption = caption
 
@@ -175,7 +170,6 @@ class SimpleGUI:
         # All these gui.<variable> elements are globals in this file.
         gui.WINDOW = self.make_window(caption, gui_left_upper, gui_right_upper=gui_right_upper,
                                       clear=clear, bounce=bounce, fps=fps)
-
         pg.init()
         gui.FONT = SysFont(None, int(1.5 * gui.BLOCK_SPACING()))
 
@@ -237,7 +231,7 @@ class SimpleGUI:
         # graph is a drawing area, a screen on which the model is portrayed, i.e., the patches and the agents.
         # It consists mainly of a TKCanvas.
         graph = sg.Graph(self.screen_shape_width_height, lower_left_pixel_xy, upper_right_pixel_xy,
-                         background_color='black', key='-GRAPH-', enable_events=True)
+                         background_color='black', key='-GRAPH-', enable_events=True, drag_submits=True)
         col2 = gui_right_upper + [[graph]]
 
         # layout is the actual layout of the window. The stuff above organizes it into component parts.

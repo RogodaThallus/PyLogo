@@ -14,6 +14,7 @@ import core.pairs as pairs
 import core.utils as utils
 from core.gui import HALF_PATCH_SIZE, PATCH_SIZE, SHAPES
 from core.pairs import Pixel_xy, RowCol, Velocity, XY, heading_and_speed_to_velocity
+from core.sim_engine import gui_get
 from core.world_patch_block import Block, Patch, World
 
 
@@ -153,9 +154,14 @@ class Agent(Block):
         patch = World.patches_array[row_col.row, row_col.col]
         return patch
 
+    def delete(self):
+        self.current_patch().remove_agent(self)
+        World.agents.remove(self)
+        World.links -= {lnk for lnk in World.links if lnk.includes(self)}
+
     def distance_to(self, other):
         dist = self.distance_to_pixel(other.center_pixel)
-        # wrap = not SimEngine.gui_get('Bounce?')
+        # wrap = not gui_get('Bounce?')
         # dist = (self.center_pixel).distance_to(other.center_pixel, wrap)
         return dist
 
@@ -188,15 +194,11 @@ class Agent(Block):
     def in_links(self):
         return [lnk for lnk in World.links if lnk.directed and lnk.agent_2 is self]
 
-    # @property
-    # def label(self):
-    #     return str(self.center_pixel.as_tuple())
-
     def lnk_nbrs(self):
         """
         Return a list of links from this node and the nodes to which they attach.
         """
-        lns = [(lnk, lnk.other_side(self)) for lnk in World.links if lnk.includes(self)]
+        lns = [(lnk, lnk.other_side()) for lnk in World.links if lnk.includes(self)]
         return lns
 
     def move_by_dxdy(self, dxdy: Velocity):
@@ -210,7 +212,7 @@ class Agent(Block):
         self.move_to_xy(new_center_pixel_wrapped)
 
     def move_by_velocity(self):
-        if SimEngine.gui_get('Bounce?'):
+        if gui_get('Bounce?'):
             new_velocity = self.bounce_off_screen_edge(self.velocity)
             if self.velocity != new_velocity:
                 self.set_velocity(new_velocity)
@@ -296,7 +298,7 @@ class Agent(Block):
 
     @property
     def x_y(self):
-        return self.center_pixel.as_tuple()
+        return self.center_pixel.round().as_tuple()
 
     @property
     def x(self):
@@ -305,8 +307,6 @@ class Agent(Block):
     @property
     def y(self):
         return self.center_pixel.y
-
-
 
 
 class Turtle(Agent):

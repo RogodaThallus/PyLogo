@@ -7,7 +7,7 @@ from random import randint
 
 import core.gui as gui
 import core.utils as utils
-from core.sim_engine import SimEngine
+from core.sim_engine import gui_get
 
 
 class XY(tuple):
@@ -49,18 +49,11 @@ class XY(tuple):
         return cls(tuple)
 
     def round(self, prec=0):
-        # rounded_tuple = (round(self.x, prec), round(self.y, prec))
-        # return self.restore_type(rounded)
         return self.restore_type( (round(self.x, prec), round(self.y, prec)) )
-        # clas = type(self)
-        # return clas((round(self.x, prec), round(self.y, prec)))
 
     def wrap3(self, x_limit, y_limit):
         wrapped_tuple = (self.x % x_limit, self.y % y_limit)
         return self.restore_type(wrapped_tuple)
-        # xx = self.x % x_limit
-        # yy = self.y % y_limit
-        # return self.restore_type((xx, yy))
 
     @property
     def x(self):
@@ -85,7 +78,7 @@ class Pixel_xy(XY):
 
     def distance_to(self, other):
         # Try all ways to get there possibly including wrapping around.
-        bounce = SimEngine.gui_get('Bounce?')
+        bounce = gui_get('Bounce?')
         wrap = bounce is not None and not bounce
 
         # Can't do this directly since importing World would be circular
