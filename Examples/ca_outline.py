@@ -1,8 +1,9 @@
 
 from __future__ import annotations
 
-from itertools import chain
-from typing import List
+from copy import copy
+from itertools import chain, repeat
+from random import choice
 
 import numpy as np
 
@@ -15,7 +16,7 @@ from core.utils import bin_str
 
 class CA_World(OnOffWorld):
 
-    ca_display_size = 141
+    ca_display_size = 151
 
     # bin_0_to_7 is ['000' .. '111']
     bin_0_to_7 = [bin_str(n, 3) for n in range(8)]
@@ -30,9 +31,9 @@ class CA_World(OnOffWorld):
         # To see it, try: print(self.pos_to_switch) after executing the next line.
         # The function bin_str() is defined in utils.py
 
-        # The following two lines do the same thing. Explain how both work.
         # self.pos_to_switch0 = {2**i: bin_str(i, 3) for i in range(8)}
         self.pos_to_switch = dict(zip([2**i for i in range(8)], CA_World.bin_0_to_7))
+        # print(self.pos_to_switch0 == self.pos_to_switch)
 
         # The rule number used for this run, initially set to 110 as the default rule.
         # (You might also try rule 165.)
@@ -42,43 +43,47 @@ class CA_World(OnOffWorld):
         self.set_switches_from_rule_nbr()
         self.set_binary_nbr_from_rule_nbr()
 
-        # self.ca_lines is a list of lines, each of which is a list of 0/1. Each line represents
-        # a state of the CA, i.e., all the cells in the line. self.ca_list contains the entire
-        # history of the CA.
-        self.ca_lines: List[List[int]] = []
+        # self.ca_lines is a list of lines, each of which is a list or string of 0/1. Each line
+        # representsa state of the CA, i.e., all the symbols in the line. self.ca_list contains
+        # the entire history of the CA.
+        self.lists = None
+        self.padding_element = None
+        self.ca_lines = []
         gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
         """
         Construct the initial CA line.
         It is a random line if gui_get('Random?').
-        It is a line (of length ca_display_size) if gui_get('init_line') == ''.
+        It is a line (of length ca_display_size) of 0's if gui_get('init_line') == ''.
         Otherwise it is the string in gui_get('init_line') converted into 0's and 1's.
-        (' ' and '0' are converted to 0; everything else is converted to 1.) 
+        (' ' and '0' are converted to 0; everything else is converted to 1.)
         However, if the rule includes 000 -> 1,pad the line with 0's on both ends to fill the display.
         How much to put on each end depends on the user-specific initial line and the requested justification.
         """
         if gui_get('Random?'):
-            line = ...
+            line = [choice([0, 1]) for _ in range(self.ca_display_size)] if self.lists else \
+                   ''.join([choice(['0', '1']) for _ in range(self.ca_display_size)])
         else:
-            # A line of 0's.
-            padding = [0] * (self.ca_display_size)
+            padding = self.padding_element * (self.ca_display_size)
             if gui_get('init_line') == '':
                 line = padding
             else:
                 line_0 = gui_get('init_line')
                 # Convert line_0 to 0's and 1's
-                line = [... for c in line_0]
-                # If the rule include 000 -> 1, fill out the new line with 0's.
+                # Treat '0' and ' ' as "not on".
+                line = [0 if c in ' 0' else 1 for c in line_0] if self.lists else \
+                       ''.join(['0' if c in ' 0' else '1' for c in line_0])
                 if gui_get('000'):
                     justification = gui_get('justification')
                     line_len = len(line)
                     actual_padding = padding[line_len:]
-                    line = ... if justification == 'Right' else \
-                           ... if justification == 'Left' else \
-                           ... #  justification == 'Center'
+                    line = actual_padding + line if justification == 'Right' else \
+                           line + actual_padding if justification == 'Left' else \
+                           actual_padding[len(actual_padding)//2:] + line + actual_padding[len(actual_padding)//2:]
         return line
 
+    # Used only for the list case
     @staticmethod
     def drop_extraneous_0s_from_ends_of_new_line(new_line):
         """
@@ -86,41 +91,78 @@ class CA_World(OnOffWorld):
         Return the result.
         Args:
             new_line: ca_state with perhaps extraneous 0 cells at the ends
+
         Returns: trimmed ca_state without extraneous 0 cells at the ends.
         """
-        ...
+        # Drop the 0's at the ends that are 0.
+        if not new_line[0]:
+            new_line.pop(0)
+        if not new_line[-1]:
+            new_line.pop(-1)
+        return new_line
 
+    # Used only for the list case
     def extend_ca_lines_if_needed(self, new_line):
         """
-        new_line is one cell longer at each end than ca_lines[-1]. If those extra
+        new_line is one cell longer at each then than ca_lines[-1]. If those extra
         cells are 0, delete them. If they are 1, insert a 0 cell at the corresponding
-        end of each line in ca_lines.
+        end of each line in ca_lines
         """
-        ...
+        # new_line is longer than the original line by one on each end.
+        # Extend the other lines in self.ca_lines for the ends that are non-zero
+        if new_line[0] or new_line[-1]:
+            for line in self.ca_lines:
+                if new_line[0]:
+                    line.insert(0, 0)
+                if new_line[-1]:
+                    line.append(0)
 
-    @staticmethod
-    def generate_new_line_from_current_line(prev_line):
+    def generate_new_line_from_current_line(self, prev_line):
         """
-        The argument is (a copy of) the current line, i.e., copy(self.ca_lines[-1]).
-        We call it prev_line because that's the role it plays in this method.
+        The argument is (a copy of) the current line. We call it prev_line because that's the role
+        it plays in this method.
+
         Generate the new line in these steps.
-        1. Add 0 to both ends of prev_line. (We do that because we want to allow the
+        1. Add '00' or (0, 0) to both ends of prev_line. (We do that because we want to allow the
         new line to extend the current line on either end. So start with a default extension.
-        2. Insert an additional 0 at each end of prev_line. That's because we need a triple
-        to generate the cells at the end of the new line. So, by this time the original
-        line has been extended by [0, 0] on both ends.
-        3. Apply the rules (i.e., the switches) to the result of step 2. This produces a line
-        which is one cell shorter than the current prev_line on each end. That is, it is
-        one cell longer on each end than the original prev_line.
-        4. Return that newly generated line. It may have 0 or 1 at each end.
+        In addition, we need a triple to generate the symbols at the end of the new line.)
+        Strings are immutable; string concatenation (+) does not change the original strings.
+
+        2. Apply the rules (i.e., the switches) to the triples extracted from the line resulting from step 1.
+
+            a. Look up the truth value of each triple. Is its switch on or off?
+            b. Convert that boolean first to an int (0 or 1) and then to a character ('0' or '1').
+            These two steps are done in a single list comprehension. The result is new_line_chars: List[str].
+            Each element of new_line_chars is a string of one character, either '0' or '1'.
+
+            c. Use join to combine that list of characters into a new string.
+
+        This produces a line which is one symbol shorter than the current prev_line on each end.
+        That is, it is one symbol longer on each end than the original current line. It may have
+        0 or 1 at each end.
+
         Args:
             prev_line: The current state of the CA.
         Returns: The next state of the CA.
         """
         # Extend the current line two to the left and right.
         # Want to be able to generate one additional value at each end.
-        prev_line = '00' + prev_line + '00'
-        new_line = ...
+        if self.lists:
+            prev_line.insert(0, 0)
+            prev_line.insert(0, 0)
+            prev_line.extend([0, 0])
+            triples = [''.join(map(str, prev_line[i:i + 3])) for i in range(len(prev_line) - 2)]
+            new_line = [int(gui_get(triple)) for triple in triples]
+        else:
+            prev_line = '00' + prev_line + '00'
+
+            # For each triple of characters in the prev_line, look up the setting of the corresponding switch.
+            # (gui_get(prev_line[i:i + 3]))
+            # Convert its Truth value (rule is on/off) to an int and then to a one character str.
+            new_line_chars = [str(int(gui_get(prev_line[i:i + 3]))) for i in range(len(prev_line) - 2)]
+
+            # Finally, join those strings together into a new string.
+            new_line = ''.join(new_line_chars)
         return new_line
 
     def get_rule_nbr_from_switches(self):
@@ -128,7 +170,12 @@ class CA_World(OnOffWorld):
         Translate the on/off of the switches to a rule number.
         This is the inverse of set_switches_from_rule_nbr(), but it doesn't set the 'Rule_nbr' Slider.
         """
-        ...
+        rule_nbr = 0
+        (_event, values) = gui.WINDOW.read(timeout=10)
+        for (pos, key) in self.pos_to_switch.items():
+            if values[key]:
+                rule_nbr += pos
+        return rule_nbr
 
     def handle_event(self, event):
         """
@@ -145,13 +192,20 @@ class CA_World(OnOffWorld):
         # When the user checks the 'Random?' box, the Input line area should disappear.
         # When the user unchecks the 'Random?' box, the Input line area should re-appear.
         elif event == 'Random?':
-            ...
+            disabled = gui_get('Random?')
+            gui_set('init_line', visible=not disabled, value='1')
 
     def make_switches_and_rule_nbr_consistent(self):
         """
         Make the Slider, the switches, and the bin number consistent: all should contain self.rule_nbr.
         """
-        ...
+        new_switches_nbr = self.get_rule_nbr_from_switches()
+        if self.rule_nbr != new_switches_nbr:
+            self.rule_nbr = new_switches_nbr
+        else:
+            self.rule_nbr = gui_get('Rule_nbr')
+            self.set_switches_from_rule_nbr()
+        self.set_binary_nbr_from_rule_nbr()
 
     def set_binary_nbr_from_rule_nbr(self):
         """
@@ -159,16 +213,21 @@ class CA_World(OnOffWorld):
         gui.WINDOW['bin_string'] widget. For example, if self.rule_nbr is 110,
         the string '(01101110)' is stored in gui.WINDOW['bin_string']. Include
         the parentheses around the binary number.
+
         Use gui_set('bin_string', value=new_value) to update the value of the widget.
         """
-        ...
+        binary_rule_nbr = bin_str(self.rule_nbr, 8)
+        gui_set('Rule_nbr', value=self.rule_nbr)
+        new_bin_value = binary_rule_nbr + ' (binary)'
+        gui_set('bin_string', value=new_bin_value)
 
     def set_display_from_lines(self):
         """
         Copy values from self.ca_lines to the patches. There are two issues.
         1. Is self.ca_lines longer/shorter than the number of Patch rows in the display?
-        2. Are there more/fewer cells-per-line than Patches-per-row?
+        2. Are there more/fewer symbols-per-line than Patches-per-row?
         What do you do in each case?
+
         This is the most difficult method. Here is the outline I used.
         """
         # Get the current setting of 'justification'.
@@ -183,16 +242,18 @@ class CA_World(OnOffWorld):
         # How many blanks must be prepended to a line to be displayed to fill a display row?
         # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
         left_padding_needed = 0 if ca_line_width >= display_width or justification == 'Left' else \
-                              ...
+                              (display_width - ca_line_width)//2  if justification == 'Center' else \
+                              display_width - ca_line_width     # if justification == 'Right'
 
         # Use [0]*n to get a list of n 0s to use as left padding.
-        left_padding = ...
+        left_padding = self.padding_element * left_padding_needed
 
-        # Which elements of the ca_line are to be displayed?
-        # More to the point, what is index of the first element of the line to be displayed?
+        # Which symbols of the ca_line are to be displayed?
+        # More to the point, what is index of the first symbol of the line to be displayed?
         # Will be 0 if left_padding is the empty list. Otherwise compute the values for the other cases.
         left_ca_line_index = 0 if display_width >= ca_line_width or justification == 'Left' else \
-                             ...
+                             (ca_line_width - display_width)//2  if justification == 'Center' else \
+                             ca_line_width - display_width     # if justification == 'Right'
 
         # Reverse both self.ca_lines and CA_World.patches_array.
         ca_lines_to_display = reversed(self.ca_lines)
@@ -212,10 +273,10 @@ class CA_World(OnOffWorld):
             # The values in ca_line are to be displayed on patch_row.
             # The issue now is how to align them.
 
-            # Which elements of ca_line should be displayed?
-            # We display all the elements starting at left_ca_line_index (computed above).
-            # Use a slice to identify these elements.
-            ca_line_portion = ca_line[...]
+            # Which symbols of ca_line should be displayed?
+            # We display all the symbols starting at left_ca_line_index (computed above).
+            # Use a slice to identify these symbols.
+            ca_line_portion = ca_line[left_ca_line_index:]
 
             # For the complete display line and the desired justification,
             # we may need to pad ca_line_portion to the left or right (or both).
@@ -224,11 +285,11 @@ class CA_World(OnOffWorld):
 
             # Put the three pieces together to get the full line.
             # Use chain() from itertools to combine the three parts of the line:
-            #          left_padding, ca_line_portion, right_padding.
-            padded_line = chain(..., ca_line_portion, ...)
+            #                   left_padding, ca_line_portion, right_padding.
+            padded_line = chain(left_padding, ca_line_portion, repeat('0'))
 
-            # padded_line has the right number of 0's at the left. It then contains the elements from ca_line
-            # to be displayed. If we need more elements to display, padded_line includes an unlimted number of
+            # padded_line has the right number of 0's at the left. It then contains the symbols from ca_line
+            # to be displayed. If we need more symbols to display, padded_line includes an unlimted number of
             # trailing 0's.
 
             # Since padded_line will be displayed on patch_row, we can use zip again to pair up the values
@@ -239,20 +300,24 @@ class CA_World(OnOffWorld):
 
             # Step through these value/patch pairs and put the values into the associated Patches.
             for (ca_val, patch) in ca_values_patchs:
-                # Use the set_on_off() method of OnOffPatch to set the patch to ca_val.
-                patch.set_on_off(ca_val)
-
+                # Use the set_on_off() method of OnOffPatch to set the patch based on ca_val.
+                patch.set_on_off(int(ca_val))
 
     def set_switches_from_rule_nbr(self):
         """
         Update the settings of the switches based on self.rule_nbr.
         Note that the 2^i position of self.rule_nbr corresponds to self.pos_to_switch[i]. That is,
         self.pos_to_switch[i] returns the key for the switch representing position  2^i.
+
         Set that switch as follows: gui_set(self.pos_to_switch[pos], value=new_value).
         (new_value will be either True or False, i.e., 1 or 0.)
+
         This is the inverse of get_rule_nbr_from_switches().
         """
-        ...
+        rule_nbr = self.rule_nbr
+        for pos in self.pos_to_switch:
+            gui_set(self.pos_to_switch[pos], value=rule_nbr % 2)
+            rule_nbr = rule_nbr // 2
 
     def setup(self):
         """
@@ -260,39 +325,65 @@ class CA_World(OnOffWorld):
         Give the switches priority.
         That is, if the slider and the switches are both different from self.rule_nbr,
         use the value derived from the switches as the new value of self.rule_nbr.
+
         Once the slider, the switches, and the bin_string of the rule number are consistent,
         set self.ca_lines[0] to the line generated by build_initial_line.
         """
-        ...
+        self.lists = gui_get('lists_or_strings') == 'Lists'
+        self.padding_element = [0] if self.lists else '0'
+
+        self.make_switches_and_rule_nbr_consistent()
+
+        for patch in CA_World.patches:
+            patch.set_on_off(False)
+
+        initial_line = self.build_initial_line()
+
+        self.ca_lines = [initial_line]
+
+        self.set_display_from_lines()
 
     def step(self):
         """
         Take one step in the simulation.
         (a) Generate an additional line for the ca. (Use a copy of self.ca_lines[-1].)
         (b) Extend all lines in ca_lines if the new line is longer (with additional 1's) than its predecessor.
-        (c) Trim the new line and add to self.ca_lines
+        (c) Trim the new line and add it to the end of self.ca_lines.
         (d) Refresh display from values in self.ca_lines.
         """
         # (a)
-        new_line = ... # The new state derived from self.ca_lines[-1]
+        new_line: str = self.generate_new_line_from_current_line(copy(self.ca_lines[-1]))
 
         # (b)
-        # Extend lines in self.ca_lines at each end as needed.
-        # (Don't extend for extra 0's at the ends.)
-        # Can't do step (c) first because we would lose track of which end was extended.
-        ...
+        # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
+        if self.lists:
+            self.extend_ca_lines_if_needed(new_line)
+        else:  # Strings
+            line_end = {'1': '0', '0': ''}
+            # If either end is '1', add '0' to that end of all strings.
+            # Can't drop the 0's first because we would lose track of which end was extended.
+            if '1' in (new_line[0], new_line[-1]):
+                # Use the line_end dictionary to look up values for left_end and right_end
+                left_end = line_end[new_line[0]]
+                right_end = line_end[new_line[-1]]
+                self.ca_lines = [left_end + line + right_end for line in self.ca_lines]
 
         # (c)
-        # Drop extraneous 0s at the end of new_line
-        ...
+        if self.lists:
+            trimmed_new_line = self.drop_extraneous_0s_from_ends_of_new_line(new_line)
+        else:  # Strings
+            start = 0 if new_line[0] == '1' else 1
+            end = len(new_line) if new_line[-1] == '1' else len(new_line) - 1
+            trimmed_new_line: str = new_line[start:end]
+
         # Add trimmed_new_line to the end of self.ca_lines
-        ...
+        self.ca_lines.append(trimmed_new_line)
 
         # (d)
         # Refresh the display from self.ca_lines
-        ...
+        self.set_display_from_lines()
         # Update the 'rows' widget.
-        ...
+        gui_set('rows', value=len(self.ca_lines))
 
 
 # ############################################## Define GUI ############################################## #
