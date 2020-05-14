@@ -53,13 +53,6 @@ class CA_World(OnOffWorld):
         # history of the CA.
         self.ca_lines: List[List[int]] = []
 
-
-        #For testing --- REMOVE
-        self.ca_lines.append([])
-        self.ca_lines[0] = [0,0,1,0,0]
-        #end of test code
-
-
         # gui.WINDOW['rows'].update(value=len(self.ca_lines))
         SimEngine.gui_set('rows', value=len(self.ca_lines))
 
