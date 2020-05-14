@@ -16,7 +16,7 @@ from core.utils import bin_str
 
 class CA_World(OnOffWorld):
 
-    ca_display_size = 225
+    ca_display_size = 151
 
     # bin_0_to_7 is ['000' .. '111']
     bin_0_to_7 = [bin_str(n, 3) for n in range(8)]
