@@ -46,7 +46,9 @@ class CA_World(OnOffWorld):
         gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
-        # Construct the initial CA line.
+        """
+        Construct the initial CA line.
+        """
         if gui_get('Random?'):
             line = [choice([0, 1]) for _ in range(self.ca_display_size)] if self.lists else \
                    ''.join([choice(['0', '1']) for _ in range(self.ca_display_size)])
@@ -79,11 +81,6 @@ class CA_World(OnOffWorld):
         return new_line
 
     def extend_ca_lines_if_needed(self, new_line):
-        """
-        new_line is one cell longer at each then than ca_lines[-1]. If those extra
-        cells are 0, delete them. If they are 1, insert a 0 cell at the corresponding
-        end of each line in ca_lines
-        """
         # new_line is longer than the original line by one on each end.
         # Extend the other lines in self.ca_lines for the ends that are non-zero
         if new_line[0] or new_line[-1]:
@@ -94,35 +91,8 @@ class CA_World(OnOffWorld):
                     line.append(0)
 
     def generate_new_line_from_current_line(self, prev_line):
-        """
-        The argument is (a copy of) the current line. We call it prev_line because that's the role
-        it plays in this method.
-
-        Generate the new line in these steps.
-        1. Add '00' or (0, 0) to both ends of prev_line. (We do that because we want to allow the
-        new line to extend the current line on either end. So start with a default extension.
-        In addition, we need a triple to generate the symbols at the end of the new line.)
-        Strings are immutable; string concatenation (+) does not change the original strings.
-
-        2. Apply the rules (i.e., the switches) to the triples extracted from the line resulting from step 1.
-
-            a. Look up the truth value of each triple. Is its switch on or off?
-            b. Convert that boolean first to an int (0 or 1) and then to a character ('0' or '1').
-            These two steps are done in a single list comprehension. The result is new_line_chars: List[str].
-            Each element of new_line_chars is a string of one character, either '0' or '1'.
-
-            c. Use join to combine that list of characters into a new string.
-
-        This produces a line which is one symbol shorter than the current prev_line on each end.
-        That is, it is one symbol longer on each end than the original current line. It may have
-        0 or 1 at each end.
-
-        Args:
-            prev_line: The current state of the CA.
-        Returns: The next state of the CA.
-        """
         # Extend the current line two to the left and right.
-        # Want to be able to generate one additional value at each end.
+        # Be able to generate one additional value at each end.
         if self.lists:
             prev_line.insert(0, 0)
             prev_line.insert(0, 0)
@@ -131,13 +101,7 @@ class CA_World(OnOffWorld):
             new_line = [int(gui_get(triple)) for triple in triples]
         else:
             prev_line = '00' + prev_line + '00'
-
-            # For each triple of characters in the prev_line, look up the setting of the corresponding switch.
-            # (gui_get(prev_line[i:i + 3]))
-            # Convert its Truth value (rule is on/off) to an int and then to a one character str.
             new_line_chars = [str(int(gui_get(prev_line[i:i + 3]))) for i in range(len(prev_line) - 2)]
-
-            # Finally, join those strings together into a new string.
             new_line = ''.join(new_line_chars)
         return new_line
 
@@ -199,34 +163,21 @@ class CA_World(OnOffWorld):
 
     def set_display_from_lines(self):
         """
-        Copy values from self.ca_lines to the patches. There are two issues.
-        1. Is self.ca_lines longer/shorter than the number of Patch rows in the display?
-        2. Are there more/fewer symbols-per-line than Patches-per-row?
-        What do you do in each case?
-
-        This is the most difficult method. Here is the outline I used.
+        Copy values from self.ca_lines to the patches. One issue is dealing with
+        cases in which there are more or fewer lines than Patch row.
         """
-        # Get the current setting of 'justification'.
         justification = gui_get('justification')
-
-        # Get the two relevant widths.
         display_width = gui.PATCH_COLS
-
-        # All the lines in self.ca_lines are the same length.
         ca_line_width = len(self.ca_lines[0])
 
-        # How many blanks must be prepended to a line to be displayed to fill a display row?
-        # Will be 0 if the ca_line is at least as long as the display row or the line is left-justified.
+        # How many 0s must be prepended to a line to be displayed to fill a display row
         left_padding_needed = 0 if ca_line_width >= display_width or justification == 'Left' else \
                               (display_width - ca_line_width)//2  if justification == 'Center' else \
                               display_width - ca_line_width     # if justification == 'Right'
 
-        # Use [0]*n to get a list of n 0s to use as left padding.
         left_padding = self.padding_element * left_padding_needed
 
-        # Which symbols of the ca_line are to be displayed?
-        # More to the point, what is index of the first symbol of the line to be displayed?
-        # Will be 0 if left_padding is the empty list. Otherwise compute the values for the other cases.
+        # What is index of the first symbol of the line to be displayed?
         left_ca_line_index = 0 if display_width >= ca_line_width or justification == 'Left' else \
                              (ca_line_width - display_width)//2  if justification == 'Center' else \
                              ca_line_width - display_width     # if justification == 'Right'
@@ -235,48 +186,24 @@ class CA_World(OnOffWorld):
         ca_lines_to_display = reversed(self.ca_lines)
         patch_rows_to_display_on = np.flip(CA_World.patches_array, axis=0)
 
-        # Now we can use zip to match up ca_lines_to_display and patch_rows_to_display on.
-        # In both cases we are starting at the bottom and working our way up.
         ca_lines_patch_rows = zip(ca_lines_to_display, patch_rows_to_display_on)
 
-        # zip is given two iterables and produces a sequence of pairs of elements, one from each.
-        # An important feature of zip is that it stops whenever either of its arguments ends.
-        # In particular, the two arguments needn't be the same length. Zip simply uses all the elements
-        # of the shorter argument and pairs them with the initial elements of the longer argument.
-
-        # We can now step through the corresponding pairs.
         for (ca_line, patch_row) in ca_lines_patch_rows:
-            # The values in ca_line are to be displayed on patch_row.
             # The issue now is how to align them.
 
-            # Which symbols of ca_line should be displayed?
             # We display all the symbols starting at left_ca_line_index (computed above).
-            # Use a slice to identify these symbols.
             ca_line_portion = ca_line[left_ca_line_index:]
 
-            # For the complete display line and the desired justification,
-            # we may need to pad ca_line_portion to the left or right (or both).
-            # We need left_padding (computed above) to the left and an arbitrary sequence of 0's to the right.
-            # (Use repeat() from itertools for the padding on the right. It doesn't matter if it's too long!)
-
-            # Put the three pieces together to get the full line.
-            # Use chain() from itertools to combine the three parts of the line:
-            #                   left_padding, ca_line_portion, right_padding.
+            # we may need to pad ca_line_portion to the left/right.
             padded_line = chain(left_padding, ca_line_portion, repeat('0'))
 
-            # padded_line has the right number of 0's at the left. It then contains the symbols from ca_line
-            # to be displayed. If we need more symbols to display, padded_line includes an unlimted number of
-            # trailing 0's.
-
-            # Since padded_line will be displayed on patch_row, we can use zip again to pair up the values
-            # from padded_line with the Patches in patch_row. Since padded_line includes an unlimited number
-            # of 0's at the end, zip will stop when it reaches the last Patch in patch_row.
-
-            ca_values_patchs = zip(padded_line, patch_row)
+            # padded_line has the right number of 0's at the left.
+            # It then contains the symbols from ca_line to be displayed.
+            # padded_line includes an unlimted number of trailing 0's.
+            ca_values_patches = zip(padded_line, patch_row)
 
             # Step through these value/patch pairs and put the values into the associated Patches.
-            for (ca_val, patch) in ca_values_patchs:
-                # Use the set_on_off() method of OnOffPatch to set the patch based on ca_val.
+            for (ca_val, patch) in ca_values_patches:
                 patch.set_on_off(int(ca_val))
 
     def set_switches_from_rule_nbr(self):
@@ -322,43 +249,33 @@ class CA_World(OnOffWorld):
     def step(self):
         """
         Take one step in the simulation.
-        (a) Generate an additional line for the ca. (Use a copy of self.ca_lines[-1].)
-        (b) Extend all lines in ca_lines if the new line is longer (with additional 1's) than its predecessor.
-        (c) Trim the new line and add it to the end of self.ca_lines.
-        (d) Refresh display from values in self.ca_lines.
+        o Generate an additional line in self.ca_lines.
+        o Copy self.ca_lines to the display
         """
-        # (a)
         new_line: str = self.generate_new_line_from_current_line(copy(self.ca_lines[-1]))
 
-        # (b)
+        # Extend all lines in ca_lines if the new line is longer (with additional 1's) than its predecessor.
         # Extend lines in self.ca_lines at each end as needed. (Don't extend for extra 0's at the ends.)
         if self.lists:
             self.extend_ca_lines_if_needed(new_line)
-        else:  # Strings
+        else:
             line_end = {'1': '0', '0': ''}
             # If either end is '1', add '0' to that end of all strings.
-            # Can't drop the 0's first because we would lose track of which end was extended.
             if '1' in (new_line[0], new_line[-1]):
-                # Use the line_end dictionary to look up values for left_end and right_end
                 left_end = line_end[new_line[0]]
                 right_end = line_end[new_line[-1]]
                 self.ca_lines = [left_end + line + right_end for line in self.ca_lines]
 
-        # (c)
+        # Trim the new line and add it to the end of self.ca_lines.
         if self.lists:
             trimmed_new_line = self.drop_extraneous_0s_from_ends_of_new_line(new_line)
-        else:  # Strings
+        else:
             start = 0 if new_line[0] == '1' else 1
             end = len(new_line) if new_line[-1] == '1' else len(new_line) - 1
             trimmed_new_line: str = new_line[start:end]
 
-        # Add trimmed_new_line to the end of self.ca_lines
         self.ca_lines.append(trimmed_new_line)
-
-        # (d)
-        # Refresh the display from self.ca_lines
         self.set_display_from_lines()
-        # Update the 'rows' widget.
         gui_set('rows', value=len(self.ca_lines))
 
 

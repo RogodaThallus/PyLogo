@@ -2,8 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="945dd5c1-c04c-418d-ae96-0662f20179fe" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Examples/ca_outline.py" beforeDir="false" afterPath="$PROJECT_DIR$/Examples/ca_outline.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Examples/ca_outline5.py" beforeDir="false" afterPath="$PROJECT_DIR$/Examples/ca_outline5.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
