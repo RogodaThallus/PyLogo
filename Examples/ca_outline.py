@@ -313,7 +313,7 @@ ca_left_upper = \
 # These are the actual GUI widgets, which we access via their keys.
 # The pos_to_switch dictionary maps position values in the rule number as a binary number
 # to these widgets. Each widget corresponds to a position in the rule number.
-# Note how we generate the text for the chechboxes.
+# Note how we generate the text for the checkboxes.
 switches = [sg.CB(n+'\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True) for n in reversed(CA_World.bin_0_to_7)]
 
 """ 
