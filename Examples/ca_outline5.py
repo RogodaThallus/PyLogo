@@ -16,7 +16,6 @@ from typing import List
 
 
 class CA_World(OnOffWorld):
-
     ca_display_size = 151
 
     # bin_0_to_7 is ['000' .. '111']
@@ -32,7 +31,7 @@ class CA_World(OnOffWorld):
         # To see it, try: print(self.pos_to_switch) after executing the next line.
         # The function bin_str() is defined in utils.py
 
-        self.pos_to_switch = dict(zip([2**i for i in range(8)], CA_World.bin_0_to_7))
+        self.pos_to_switch = dict(zip([2 ** i for i in range(8)], CA_World.bin_0_to_7))
         # print(self.pos_to_switch)
 
         # The rule number used for this run, initially set to 110 as the default rule.
@@ -73,9 +72,8 @@ class CA_World(OnOffWorld):
         #     line[col] = 1
         # return line
 
-
-        #if justification is used to display it is unnecessary to make the initial line as wide as the gui except
-        #when random
+        # if justification is used to display it is unnecessary to make the initial line as wide as the gui except
+        # when random
         self.init = SimEngine.gui_get('init')
         if self.init == 'Random':
             # Set the initial row to random 1/0.
@@ -93,7 +91,7 @@ class CA_World(OnOffWorld):
             return line
 
         else:
-            return [0,0,1,0,0]
+            return [0, 0, 1, 0, 0]
 
     def get_rule_nbr_from_switches(self):
         """
@@ -117,7 +115,6 @@ class CA_World(OnOffWorld):
         """
         # Handle color change requests.
         super().handle_event(event)
-
 
         if event in ['Rule_nbr'] + CA_World.bin_0_to_7:
             if event == 'Rule_nbr':
@@ -160,7 +157,7 @@ class CA_World(OnOffWorld):
         while len(output2) < 8:
             output2.append('0')
 
-        #reverse to alignt to rules and index
+        # reverse to alignt to rules and index
         if rev:
             return output2
         else:
@@ -229,7 +226,7 @@ class CA_World(OnOffWorld):
         This is the inverse of get_rule_nbr_from_switches().
         """
         for rule_switch, enabled in zip(CA_World.bin_0_to_7, self.int_to_8_bit_binary(self.rule_nbr)):
-            SimEngine.gui_set(rule_switch, value=(True if enabled=='1' else False))
+            SimEngine.gui_set(rule_switch, value=(True if enabled == '1' else False))
 
     def setup(self):
         """
@@ -255,25 +252,24 @@ class CA_World(OnOffWorld):
         o Copy self.ca_lines to the display
         """
 
-        #make a dictionary of rules and which are active
+        # make a dictionary of rules and which are active
         binary = self.int_to_8_bit_binary(self.rule_nbr)
         binary_str = ''.join(binary)
 
         active_rules = dict(zip(CA_World.bin_0_to_7, list(binary_str)))
 
-
-        #variable to store the new computed line
-        #first one will always be zero as there is no rule
-        #find better explanation
+        # variable to store the new computed line
+        # first one will always be zero as there is no rule
+        # find better explanation
         new_line = [0]
 
-        #compute the new line
+        # compute the new line
 
-        #for each ca triplet to check
+        # for each ca triplet to check
         for i in range(len(self.ca_lines[-1]) - 2):
-            #make the array of three cells together ex [1,0,0] starting at index one and ending at index 3 before the end
-            #then check to see if it is active from the dictionary
-            #add the new cell as a 1 if active else set it to 0
+            # make the array of three cells together ex [1,0,0] starting at index one and ending at index 3 before the end
+            # then check to see if it is active from the dictionary
+            # add the new cell as a 1 if active else set it to 0
             new_line.append(1 if active_rules["".join(str(x) for x in self.ca_lines[-1][i:i + 3])] == '1' else 0)
 
         # variable to store the new computed line
@@ -281,16 +277,15 @@ class CA_World(OnOffWorld):
         # find better explanation
         new_line.append(0)
 
-
         self.ca_lines.append(new_line)
 
-
-        #add leading and trailing zeroes to all entries in the history
+        # add leading and trailing zeroes to all entries in the history
         for row in self.ca_lines:
-            row.insert(0,0)
+            row.insert(0, 0)
             row.append(0)
 
         self.set_display_from_lines()
+
 
 # ############################################## Define GUI ############################################## #
 import PySimpleGUI as sg
@@ -303,7 +298,7 @@ ca_left_upper = [[sg.Text('Initial row:'),
                   sg.Combo(values=['Left', 'Center', 'Right', 'Random'], key='init', default_value='Right')],
                  [sg.Text('Rows:'), sg.Text('     0', key='rows')],
                  HOR_SEP(30)] + \
-                 on_off_left_upper
+                on_off_left_upper
 
 # The switches are CheckBoxes with keys from CA_World.bin_0_to_7 (in reverse).
 # These are the actual GUI widgets, which we access via their keys.
@@ -311,7 +306,7 @@ ca_left_upper = [[sg.Text('Initial row:'),
 # to these widgets. Each widget corresponds to a position in the rule number.
 # Note how we generate the text for the chechboxes.
 switches = [sg.CB(n + '\n 1', key=n, pad=((30, 0), (0, 0)), enable_events=True)
-                                             for n in reversed(CA_World.bin_0_to_7)]
+            for n in reversed(CA_World.bin_0_to_7)]
 
 """ 
 This  material appears above the screen: 
@@ -324,7 +319,6 @@ ca_right_upper = [[sg.Text('Rule number', pad=((100, 0), (20, 10))),
 
                   switches
                   ]
-
 
 if __name__ == "__main__":
     """

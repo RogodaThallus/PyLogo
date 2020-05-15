@@ -26,9 +26,8 @@ class CA_World(OnOffWorld):
         # To see it, try: print(self.pos_to_switch) after executing the next line.
         # The function bin_str() is defined in utils.py
 
-        # self.pos_to_switch0 = {2**i: bin_str(i, 3) for i in range(8)}
         self.pos_to_switch = dict(zip([2**i for i in range(8)], CA_World.bin_0_to_7))
-        # print(self.pos_to_switch0 == self.pos_to_switch)
+        # print(self.pos_to_switch)
 
         # The rule number used for this run, initially set to 110 as the default rule.
         # (You might also try rule 165.)
@@ -39,7 +38,7 @@ class CA_World(OnOffWorld):
         self.set_binary_nbr_from_rule_nbr()
 
         # self.ca_lines is a list of lines, each of which is a list or string of 0/1. Each line
-        # representsa state of the CA, i.e., all the symbols in the line. self.ca_list contains
+        # represents a state of the CA, i.e., all the symbols in the line. self.ca_list contains
         # the entire history of the CA.
         self.lists = None
         self.padding_element = None
@@ -47,15 +46,7 @@ class CA_World(OnOffWorld):
         gui_set('rows', value=len(self.ca_lines))
 
     def build_initial_line(self):
-        """
-        Construct the initial CA line.
-        It is a random line if gui_get('Random?').
-        It is a line (of length ca_display_size) of 0's if gui_get('init_line') == ''.
-        Otherwise it is the string in gui_get('init_line') converted into 0's and 1's.
-        (' ' and '0' are converted to 0; everything else is converted to 1.)
-        However, if the rule includes 000 -> 1,pad the line with 0's on both ends to fill the display.
-        How much to put on each end depends on the user-specific initial line and the requested justification.
-        """
+        # Construct the initial CA line.
         if gui_get('Random?'):
             line = [choice([0, 1]) for _ in range(self.ca_display_size)] if self.lists else \
                    ''.join([choice(['0', '1']) for _ in range(self.ca_display_size)])
@@ -78,25 +69,15 @@ class CA_World(OnOffWorld):
                            actual_padding[len(actual_padding)//2:] + line + actual_padding[len(actual_padding)//2:]
         return line
 
-    # Used only for the list case
     @staticmethod
     def drop_extraneous_0s_from_ends_of_new_line(new_line):
-        """
-        Drop the end cell at each end of new_line if it is 0. Keep it otherwise.
-        Return the result.
-        Args:
-            new_line: ca_state with perhaps extraneous 0 cells at the ends
-
-        Returns: trimmed ca_state without extraneous 0 cells at the ends.
-        """
-        # Drop the 0's at the ends that are 0.
+        # Drop the 0s at the ends.
         if not new_line[0]:
             new_line.pop(0)
         if not new_line[-1]:
             new_line.pop(-1)
         return new_line
 
-    # Used only for the list case
     def extend_ca_lines_if_needed(self, new_line):
         """
         new_line is one cell longer at each then than ca_lines[-1]. If those extra
